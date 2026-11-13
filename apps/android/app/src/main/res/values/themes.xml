@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Edge-to-edge is configured in MainActivity via enableEdgeToEdge(), which owns
+      the system bar colours on every API level. statusBarColor/navigationBarColor
+      are ignored from API 35 onward, so they are deliberately not set here.
+    -->
+    <style name="Theme.Ssmmss" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFFFF</item>
+    </style>
+</resources>

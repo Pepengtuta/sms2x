@@ -1,0 +1,24 @@
+# Local secrets and environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.gradle/
+*.apk
+
+# Android signing material (personal project — never commit keys)
+apps/android/keystore.jks
+apps/android/keystore.properties
+apps/android/local.properties
+
+# Local developer reference (NEVER COMMITTED TO GIT)
+LOCAL_REFERENCE.md
+.agent/
+.kilo/
+.task-todo.md/
+

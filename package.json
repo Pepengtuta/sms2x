@@ -1,0 +1,28 @@
+{
+  "name": "ssmmss",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart SIM Multi-phone Messaging Sender Service",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "prisma:push": "npm --prefix apps/api run prisma:push",
+    "prisma:studio": "npm --prefix apps/api run prisma:studio",
+    "test": "npm --prefix apps/api test",
+    "android:debug": "cd apps/android && gradlew.bat assembleDebug",
+    "android:release": "cd apps/android && gradlew.bat assembleRelease"
+  },
+  "keywords": [
+    "sms",
+    "gateway",
+    "android",
+    "fastify"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
