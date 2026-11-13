@@ -20,5 +20,5 @@ apps/android/local.properties
 LOCAL_REFERENCE.md
 .agent/
 .kilo/
-.task-todo.md/
+.task-todo.md
 
