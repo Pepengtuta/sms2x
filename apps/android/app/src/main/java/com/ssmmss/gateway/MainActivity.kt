@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
     private var baseUrl by mutableStateOf("")
     private var deviceName by mutableStateOf("")
     private var pairingToken by mutableStateOf("")
+    private var syncInboundSms by mutableStateOf(false)
     private var statusMessage by mutableStateOf<String?>(null)
 
     private val permissionLauncher =
@@ -106,6 +107,7 @@ class MainActivity : ComponentActivity() {
 
         baseUrl = store.baseUrl
         deviceName = store.deviceName.ifBlank { android.os.Build.MODEL }
+        syncInboundSms = store.syncInboundSms
         running = store.enabled && store.isPaired
 
         requestPermissions()
@@ -137,6 +139,7 @@ class MainActivity : ComponentActivity() {
                             baseUrl = baseUrl,
                             deviceName = deviceName,
                             pairingToken = pairingToken,
+                            syncInboundSms = syncInboundSms,
                             onBaseUrlChange = {
                                 baseUrl = it
                                 store.baseUrl = it
@@ -146,6 +149,7 @@ class MainActivity : ComponentActivity() {
                                 store.deviceName = it
                             },
                             onPairingTokenChange = { pairingToken = it },
+                            onSyncInboundSmsChange = ::toggleInboundSync,
                             onPair = ::pairDevice,
                             onUnpair = ::unpairDevice,
                             onScan = ::openScanner,
@@ -156,6 +160,23 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun toggleInboundSync(enable: Boolean) {
+        syncInboundSms = enable
+        store.syncInboundSms = enable
+        if (enable) {
+            permissionLauncher.launch(
+                arrayOf(
+                    android.Manifest.permission.READ_SMS,
+                    android.Manifest.permission.READ_CONTACTS,
+                ),
+            )
+        }
+        if (running) {
+            stopService(Intent(this, GatewayForegroundService::class.java))
+            ContextCompat.startForegroundService(this, Intent(this, GatewayForegroundService::class.java))
         }
     }
 

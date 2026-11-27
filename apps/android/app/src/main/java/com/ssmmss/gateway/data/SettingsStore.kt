@@ -35,6 +35,14 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
+    var syncInboundSms: Boolean
+        get() = prefs.getBoolean(KEY_SYNC_INBOUND_SMS, false)
+        set(value) = prefs.edit().putBoolean(KEY_SYNC_INBOUND_SMS, value).apply()
+
+    var lastSyncedSmsTimestamp: Long
+        get() = prefs.getLong(KEY_LAST_SYNCED_SMS_TS, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_SYNCED_SMS_TS, value).apply()
+
     /**
      * Stable identifier for this physical phone. Generated once and kept across
      * re-pairing, so the server can tell it is the same device and revoke the
@@ -67,6 +75,8 @@ class SettingsStore(context: Context) {
         private const val KEY_DEVICE_NAME = "device_name"
         private const val KEY_DEVICE_IDENTIFIER = "device_identifier"
         private const val KEY_ENABLED = "enabled"
+        private const val KEY_SYNC_INBOUND_SMS = "sync_inbound_sms"
+        private const val KEY_LAST_SYNCED_SMS_TS = "last_synced_sms_ts"
 
         // 10.0.2.2 only reaches the host from an Android emulator. On a real
         // phone the user must enter the PC's LAN address, or scan the QR code

@@ -69,9 +69,11 @@ fun SettingsScreen(
     baseUrl: String,
     deviceName: String,
     pairingToken: String,
+    syncInboundSms: Boolean,
     onBaseUrlChange: (String) -> Unit,
     onDeviceNameChange: (String) -> Unit,
     onPairingTokenChange: (String) -> Unit,
+    onSyncInboundSmsChange: (Boolean) -> Unit,
     onPair: () -> Unit,
     onUnpair: () -> Unit,
     onScan: () -> Unit,
@@ -106,6 +108,17 @@ fun SettingsScreen(
             PlainButton("[ Unpair Device ]", onUnpair, modifier = Modifier.fillMaxWidth())
         } else {
             SolidButton("[ Pair Device ]", onPair, modifier = Modifier.fillMaxWidth())
+        }
+
+        Gap(20)
+        SectionTitle("INBOUND SMS")
+        Gap(8)
+        Label("Sync incoming SMS on this phone to the web Messages inbox")
+        Gap(8)
+        if (syncInboundSms) {
+            PlainButton("[ Disable Inbound Sync ]", { onSyncInboundSmsChange(false) }, modifier = Modifier.fillMaxWidth())
+        } else {
+            SolidButton("[ Enable Inbound Sync ]", { onSyncInboundSmsChange(true) }, modifier = Modifier.fillMaxWidth())
         }
 
         if (!statusMessage.isNullOrBlank()) {

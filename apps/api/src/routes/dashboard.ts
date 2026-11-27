@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "../plugins/prisma.js";
 import { requireJwt } from "../middleware/auth.js";
-import { parseSendPayload, queueMessage } from "../services/dispatch.js";
+import { parseSendPayload, queueMessage, normalizePeer } from "../services/dispatch.js";
 import { isDeviceOnline, DEVICE_STALE_MS } from "../services/routing.js";
 import { deriveReadiness } from "../services/readiness.js";
 import { computeHealth } from "../services/health.js";
@@ -339,6 +339,105 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     await prisma.user.update({ where: { id: user.id }, data: { defaultDeviceId: deviceId } });
     return reply.send({ success: true });
+  });
+
+  // GET /dashboard/threads — conversation list grouped by (deviceId, peer)
+  app.get("/threads", { preHandler: requireJwt }, async (request, reply) => {
+    const user = (request as any).user;
+    const { search, deviceId } = (request.query as { search?: string; deviceId?: string }) ?? {};
+    const q = typeof search === "string" ? search.trim() : "";
+    const devFilter = typeof deviceId === "string" ? deviceId.trim() : "";
+
+    // shortcut: raw SQL until inbound columns are added to schema.prisma
+    const rows = await prisma.$queryRaw<{
+      peer: string;
+      contactName: string | null;
+      lastBody: string;
+      lastDirection: string;
+      lastStatus: string;
+      lastAt: Date;
+      deviceId: string | null;
+      deviceName: string | null;
+    }[]>`
+      SELECT * FROM (
+        SELECT DISTINCT ON (COALESCE(m."deviceId", ''), COALESCE(m."peer", m."to"))
+          COALESCE(m."peer", m."to") AS "peer",
+          m."contactName",
+          m."body" AS "lastBody",
+          m."direction" AS "lastDirection",
+          m."status" AS "lastStatus",
+          m."createdAt" AS "lastAt",
+          m."deviceId",
+          d."name" AS "deviceName"
+        FROM "Message" m
+        LEFT JOIN "Device" d ON d."id" = m."deviceId"
+        WHERE m."userId" = ${user.id}
+          AND (${devFilter} = '' OR m."deviceId" = ${devFilter})
+          AND (${q} = '' OR COALESCE(m."peer", m."to") ILIKE ${"%" + q + "%"} OR COALESCE(m."contactName", '') ILIKE ${"%" + q + "%"})
+        ORDER BY COALESCE(m."deviceId", ''), COALESCE(m."peer", m."to"), m."createdAt" DESC
+      ) t
+      ORDER BY t."lastAt" DESC
+      LIMIT 50
+    `;
+
+    return reply.send({
+      threads: rows.map((r) => ({
+        peer: r.peer,
+        contactName: r.contactName ?? undefined,
+        lastBody: r.lastBody,
+        lastDirection: r.lastDirection,
+        lastStatus: r.lastStatus,
+        lastAt: r.lastAt.getTime(),
+        deviceId: r.deviceId ?? undefined,
+        deviceName: r.deviceName ?? undefined,
+      })),
+    });
+  });
+
+  // GET /dashboard/threads/:peer — chronological messages for one conversation
+  app.get("/threads/:peer", { preHandler: requireJwt }, async (request, reply) => {
+    const user = (request as any).user;
+    const { peer } = request.params as { peer: string };
+    const { deviceId } = (request.query as { deviceId?: string }) ?? {};
+    const normalized = normalizePeer(decodeURIComponent(peer));
+    const devFilter = typeof deviceId === "string" ? deviceId.trim() : "";
+
+    const rows = await prisma.$queryRaw<{
+      id: string;
+      direction: string;
+      fromNumber: string | null;
+      to: string;
+      contactName: string | null;
+      body: string;
+      status: string;
+      errorMessage: string | null;
+      failureReason: string | null;
+      createdAt: Date;
+    }[]>`
+      SELECT "id", "direction", "fromNumber", "to", "contactName", "body", "status", "errorMessage", "failureReason", "createdAt"
+      FROM "Message"
+      WHERE "userId" = ${user.id}
+        AND COALESCE("peer", "to") = ${normalized}
+        AND (${devFilter} = '' OR (${devFilter} = 'unassigned' AND "deviceId" IS NULL) OR "deviceId" = ${devFilter})
+      ORDER BY "createdAt" ASC
+      LIMIT 200
+    `;
+
+    return reply.send({
+      peer: normalized,
+      messages: rows.map((m) => ({
+        id: m.id,
+        direction: m.direction,
+        from: m.fromNumber ?? undefined,
+        to: m.to,
+        contactName: m.contactName ?? undefined,
+        body: m.body,
+        status: m.status,
+        errorMessage: m.errorMessage ?? undefined,
+        failureReason: m.failureReason ?? undefined,
+        createdAt: m.createdAt.getTime(),
+      })),
+    });
   });
 
   // GET /dashboard/messages

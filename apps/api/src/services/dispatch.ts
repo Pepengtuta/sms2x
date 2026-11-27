@@ -33,6 +33,10 @@ export function parseSendPayload(input: unknown): {
   return { to, body, deviceId, simId };
 }
 
+export function normalizePeer(phone: string): string {
+  return phone.trim().replace(/[\s()-]/g, "");
+}
+
 // shortcut: one message per request, no batching — upgrade when bulk send is requested
 export async function queueMessage(
   userId: string,
@@ -44,7 +48,7 @@ export async function queueMessage(
     throw new SendError(503, "NO_DEVICE", "No online gateway phone available");
   }
 
-  return prisma.message.create({
+  const created = await prisma.message.create({
     data: {
       userId,
       apiKeyId,
@@ -55,4 +59,8 @@ export async function queueMessage(
       status: "queued",
     },
   });
+
+  // shortcut: raw SQL until inbound columns are added to schema.prisma
+  await prisma.$executeRaw`UPDATE "Message" SET "peer" = ${normalizePeer(payload.to)} WHERE "id" = ${created.id}`;
+  return created;
 }

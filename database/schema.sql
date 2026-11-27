@@ -80,6 +80,12 @@ CREATE TABLE "Message" (
     "sendingAt" TIMESTAMP(3),
     "sentAt" TIMESTAMP(3),
     "failedAt" TIMESTAMP(3),
+    "direction" TEXT NOT NULL DEFAULT 'outbound',
+    "fromNumber" TEXT,
+    "peer" TEXT,
+    "contactName" TEXT,
+    "androidSmsId" TEXT,
+    "receivedAt" TIMESTAMP(3),
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("id")
 );
@@ -113,6 +119,12 @@ CREATE UNIQUE INDEX "SimCard_deviceId_subscriptionId_key" ON "SimCard"("deviceId
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ApiKey_keyHash_key" ON "ApiKey"("keyHash");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Message_deviceId_androidSmsId_key" ON "Message"("deviceId", "androidSmsId");
+
+-- CreateIndex
+CREATE INDEX "Message_userId_peer_createdAt_idx" ON "Message"("userId", "peer", "createdAt");
 
 -- CreateIndex
 CREATE INDEX "OtpRequest_to_idx" ON "OtpRequest"("to");

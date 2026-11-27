@@ -1,6 +1,7 @@
 package com.ssmmss.gateway.network
 
 import org.json.JSONObject
+import com.ssmmss.gateway.service.InboundSms
 import com.ssmmss.gateway.service.SimInfo
 import com.ssmmss.gateway.service.SmsFailure
 import java.net.HttpURLConnection
@@ -93,6 +94,22 @@ class ApiClient(
             payload.put("failureReason", failure.reason)
         }
         request("POST", "/gateway/messages/$messageId/status", payload)
+    }
+
+    fun syncInboundSms(messages: List<InboundSms>) {
+        if (messages.isEmpty()) return
+        val array = org.json.JSONArray()
+        messages.forEach { m ->
+            val obj = JSONObject()
+                .put("androidSmsId", m.androidSmsId)
+                .put("from", m.from)
+                .put("body", m.body)
+                .put("timestamp", m.timestamp)
+            if (m.subscriptionId != null) obj.put("subscriptionId", m.subscriptionId)
+            if (!m.contactName.isNullOrBlank()) obj.put("contactName", m.contactName)
+            array.put(obj)
+        }
+        request("POST", "/gateway/sms/sync", JSONObject().put("messages", array))
     }
 
     /** Releases this phone from the account so its token stops working. */

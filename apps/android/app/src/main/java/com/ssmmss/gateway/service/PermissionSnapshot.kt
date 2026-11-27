@@ -16,6 +16,8 @@ import androidx.core.content.ContextCompat
 object PermissionSnapshot {
     fun snapshot(context: Context): Map<String, String> = mapOf(
         "sms" to state(context, Manifest.permission.SEND_SMS),
+        "readSms" to state(context, Manifest.permission.READ_SMS),
+        "readContacts" to state(context, Manifest.permission.READ_CONTACTS),
         "phoneState" to state(context, Manifest.permission.READ_PHONE_STATE),
         "notifications" to if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             "granted"

@@ -21,6 +21,7 @@ class GatewayForegroundService : Service() {
     /** Heartbeat and polling run on separate threads so a slow request cannot starve the other. */
     private val heartbeatExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private val pollExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+    private var inboxReader: SmsInboxReader? = null
     private var started = false
 
     override fun onCreate() {
@@ -43,6 +44,15 @@ class GatewayForegroundService : Service() {
 
         val client = ApiClient(config.baseUrl, config.deviceToken)
         val sender = SmsSender(this)
+
+        if (store.syncInboundSms) {
+            inboxReader = SmsInboxReader(this) {
+                pollExecutor.execute { syncInbox(store, client) }
+            }.also { reader ->
+                reader.start()
+                pollExecutor.execute { syncInbox(store, client) }
+            }
+        }
 
         heartbeatExecutor.scheduleWithFixedDelay({
             try {
@@ -136,6 +146,22 @@ class GatewayForegroundService : Service() {
         ContextCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
 
+    private fun syncInbox(store: SettingsStore, client: ApiClient) {
+        if (!store.syncInboundSms) return
+        val reader = inboxReader ?: return
+        try {
+            val batch = reader.readSince(store.lastSyncedSmsTimestamp)
+            if (batch.isEmpty()) return
+            client.syncInboundSms(batch)
+            store.lastSyncedSmsTimestamp = batch.maxOf { it.timestamp }
+        } catch (e: ApiException) {
+            Log.w(TAG, "inbound sync rejected: ${e.status}", e)
+            if (e.status == 401) stopRuntime()
+        } catch (e: Exception) {
+            Log.w(TAG, "inbound sync failed", e)
+        }
+    }
+
     private fun stopRuntime() {
         SettingsStore(this).enabled = false
         stopSelf()
@@ -144,6 +170,8 @@ class GatewayForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        inboxReader?.stop()
+        inboxReader = null
         heartbeatExecutor.shutdownNow()
         pollExecutor.shutdownNow()
         super.onDestroy()

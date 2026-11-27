@@ -1,9 +1,10 @@
 import { FastifyInstance } from "fastify";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../plugins/prisma.js";
 import { requireDeviceToken } from "../middleware/auth.js";
 import { planPairing } from "../services/pairing.js";
+import { normalizePeer } from "../services/dispatch.js";
 
 // shortcut: pairing tokens stored in-memory, lost on restart — upgrade to DB column if multi-instance
 const pairingTokens = new Map<string, { userId: string; expiresAt: number }>();
@@ -247,6 +248,54 @@ export async function gatewayRoutes(app: FastifyInstance) {
     });
 
     return reply.send({ success: true });
+  });
+
+  // POST /gateway/sms/sync — upload inbound SMS from the phone
+  app.post("/sms/sync", { preHandler: requireDeviceToken }, async (request, reply) => {
+    const device = (request as any).device;
+    const { messages } = (request.body as { messages?: unknown }) ?? {};
+    if (!Array.isArray(messages) || messages.length > 100) {
+      return reply.status(400).send({
+        error: { code: "VALIDATION", message: "messages must be an array of at most 100 items" },
+      });
+    }
+
+    const sims = await prisma.simCard.findMany({ where: { deviceId: device.id } });
+    const simBySub = new Map(sims.map((s) => [s.subscriptionId, s]));
+
+    let synced = 0;
+    for (const raw of messages) {
+      const item = (raw ?? {}) as Record<string, unknown>;
+      const androidSmsId = typeof item.androidSmsId === "string" ? item.androidSmsId.trim() : "";
+      const from = typeof item.from === "string" ? item.from.trim() : "";
+      const body = typeof item.body === "string" ? item.body : "";
+      const ts = typeof item.timestamp === "number" && Number.isFinite(item.timestamp) ? item.timestamp : Date.now();
+      if (!androidSmsId || !from || !body) continue;
+
+      const subId = typeof item.subscriptionId === "number" ? item.subscriptionId : null;
+      const sim = subId !== null ? simBySub.get(subId) : undefined;
+      const contactName = typeof item.contactName === "string" && item.contactName.trim() ? item.contactName.trim() : null;
+      const receivedAt = new Date(ts);
+      const peer = normalizePeer(from);
+
+      // shortcut: raw SQL until inbound columns are added to schema.prisma
+      const affected = await prisma.$executeRaw`
+        INSERT INTO "Message" (
+          "id", "userId", "deviceId", "simId", "to", "body", "status",
+          "correlationId", "direction", "fromNumber", "peer", "contactName",
+          "androidSmsId", "receivedAt", "createdAt"
+        ) VALUES (
+          ${randomUUID()}, ${device.userId}, ${device.id}, ${sim?.id ?? null},
+          ${sim?.phoneNumber ?? "device"}, ${body}, 'received',
+          ${randomUUID()}, 'inbound', ${from}, ${peer}, ${contactName},
+          ${androidSmsId}, ${receivedAt}, ${receivedAt}
+        )
+        ON CONFLICT ("deviceId", "androidSmsId") DO NOTHING
+      `;
+      if (affected > 0) synced++;
+    }
+
+    return reply.send({ synced });
   });
 }
 
