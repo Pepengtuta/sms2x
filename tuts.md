@@ -33,4 +33,6 @@ adb install -r apps/android/app/build/outputs/apk/release/app-release.apk
 2. npm --prefix apps/web run dev -- --host 0.0.0.0
 
 ## For Fresh start wipe the database the default admin/admin is auto create after 'npm run dev:api'
+```sql
 TRUNCATE TABLE "Message", "OtpRequest", "SimCard", "Device", "ApiKey", "User" CASCADE;
+```
