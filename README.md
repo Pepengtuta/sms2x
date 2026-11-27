@@ -53,12 +53,13 @@ HOST="0.0.0.0"
 > detects this, and tells you how to fix it:
 > `ALTER DATABASE ssmmss SET timezone TO 'UTC';`
 
-Import the database schema and generate the Prisma client (do **not** run `npm run prisma:push`, as inbound SMS columns are managed via SQL):
+Import the database schema, set its timezone to UTC, and generate the Prisma client (do **not** run `npm run prisma:push`, as inbound SMS columns are managed via SQL):
 
 ```bash
 psql -U postgres -c "CREATE DATABASE ssmmss;"
+psql -U postgres -d ssmmss -c "ALTER DATABASE ssmmss SET timezone TO 'UTC';"
 psql -U postgres -d ssmmss -f database/ssmmss.sql
-npx --prefix apps/api prisma generate
+npm --prefix apps/api run prisma:generate
 ```
 
 ### 3. Run
